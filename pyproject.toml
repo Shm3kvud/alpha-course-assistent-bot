@@ -1,0 +1,15 @@
+[project]
+name = "alpha-course-assistent-bot"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "aiogram>=3.31.0",
+    "asyncpg>=0.32.0",
+    "langchain>=1.4.9",
+    "langchain-core>=1.7.6",
+    "langchain-ollama>=1.1.0",
+    "langchain-postgres>=0.0.19",
+    "pgvector>=0.3.6",
+]
