@@ -9,7 +9,9 @@ dependencies = [
     "asyncpg>=0.32.0",
     "langchain>=1.4.9",
     "langchain-core>=1.7.6",
+    "langchain-gigachat>=0.5.1",
     "langchain-ollama>=1.1.0",
     "langchain-postgres>=0.0.19",
     "pgvector>=0.3.6",
+    "sentence-transformers>=6.2.0",
 ]
