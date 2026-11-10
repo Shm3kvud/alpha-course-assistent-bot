@@ -33,9 +33,42 @@ Telegram-бот помощник для подбора курсов на пла�
 
 - Python 3.12
 - Aiogram
-- Модель для эмбеддингов — [уточнить]
-- Текстовая модель — [уточнить]
+- Модель для эмбеддингов — multilingual-e5-large (fallback e5-small), sentence-transformers
+- Текстовая модель — GigaChat / Ollama
 - Векторная БД — PGVector
 - LangChain-Postgres
 - Docker
 - Git
+
+## Структура проекта
+
+Примерная структура на текущий момент (часть файлов ещё заглушки/в работе):
+
+```
+alpha-course-assistent-bot/
+├── main.py              # точка входа
+├── config.py            # единые настройки из .env (Pydantic Settings)
+├── docker-compose.yml   # Postgres + pgvector
+├── Dockerfile
+├── .env.example
+├── README.md
+│
+├── bot/                 # Telegram-бот (aiogram), хендлеры, UX
+│
+├── db/                  # обычный Postgres: исходная БД + свои таблицы
+│
+├── vector_db/           # работа с pgvector
+│
+├── llm/                 # текстовая модель
+│
+├── rag/                 # RAG-логика
+│   ├── embeddings.py 
+│   ├── splitter.py 
+│   ├── retriever.py
+│   ├── ingest.py 
+│   └── pipeline.py
+│
+└── data/                # локальные данные (в git не попадает)
+```
+
+> `.env`, `data/`, `.venv/` в `.gitignore`.
