@@ -56,14 +56,16 @@ alpha-course-assistent-bot/
 ├── bot/                 # Telegram-бот (aiogram), хендлеры, UX
 │
 ├── db/                  # обычный Postgres: исходная БД + свои таблицы
-│
+│   └── db_loader.py
+|
 ├── vector_db/           # работа с pgvector
 │
 ├── llm/                 # текстовая модель
-│
+│   ├── client.py
+|   └── prompts.py
+|
 ├── rag/                 # RAG-логика
 │   ├── embeddings.py 
-│   ├── splitter.py 
 │   ├── retriever.py
 │   ├── ingest.py 
 │   └── pipeline.py
