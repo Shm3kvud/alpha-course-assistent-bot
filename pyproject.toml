@@ -12,6 +12,10 @@ dependencies = [
     "langchain-gigachat>=0.5.1",
     "langchain-postgres>=0.0.19",
     "pgvector>=0.3.6",
+<<<<<<< HEAD
     "python-dotenv>=1.2.4",
+=======
+    "psycopg[binary]>=3.3.8",
+>>>>>>> 6dc9d86 (сделала историю диалога и начала делать загрузку с бд, подгрузила в менеджер пакетов psycopg для выгрузки данных с бд)
     "sentence-transformers>=6.2.0",
 ]

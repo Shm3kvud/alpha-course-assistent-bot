@@ -1,2 +1,2 @@
-def retrieve():
+async def retrieve():
     return
