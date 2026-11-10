@@ -1,7 +1,7 @@
 import psycopg
 import asyncio
 import sys
-import json
+#import json
 from langchain_core.documents import Document
 from config import get_settings
 
@@ -167,13 +167,17 @@ async def load_calculators(cur) -> list[Document]:
         ))
     return calculators_docs
 
-async def main():
+async def get_all_documents() -> list[Document]:
     global docs
     
     conn = await connection_to_db()
     async with conn.cursor() as cursor:
         docs.extend(await load_courses(cursor))
         docs.extend(await load_articles(cursor))
+        docs.extend(await load_webinars(cursor))
+        docs.extend(await load_podcasts(cursor))
+        docs.extend(await load_documents(cursor))
+        docs.extend(await load_calculators(cursor))
 
     await conn.close()
 
@@ -184,18 +188,30 @@ async def main():
 
     output_data = []
     for doc in docs:
+        safe_metadata = {k: str(v) for k, v in doc.metadata.items()}
         output_data.append({
             "text": doc.page_content,
-            "metadata": doc.metadata
+            "metadata": safe_metadata
+        })
+
+    '''Для тестирования, что считывается в итоге:
+    output_data = []
+    for doc in docs:
+        safe_metadata = {k: str(v) for k, v in doc.metadata.items()}
+        output_data.append({
+            "text": doc.page_content,
+            "metadata": safe_metadata
         })
         
     with open("data_extracted.json", "w", encoding="utf-8") as f:
         json.dump(output_data, f, ensure_ascii=False, indent=2)
-        
     print("Данные успешно сохранены в файл data_extracted.json")
+    '''
 
-if __name__ == "__main__":        
+    return docs
+
+if __name__ == "__main__":
     if sys.platform == "win32":
         asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy()) # noqa
-    asyncio.run(main())
-    
+        
+    docs = asyncio.run(get_all_documents())
