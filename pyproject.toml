@@ -13,5 +13,6 @@ dependencies = [
     "langchain-ollama>=1.1.0",
     "langchain-postgres>=0.0.19",
     "pgvector>=0.3.6",
+    "psycopg[binary]>=3.3.8",
     "sentence-transformers>=6.2.0",
 ]
