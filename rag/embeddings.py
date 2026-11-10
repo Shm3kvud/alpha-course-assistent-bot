@@ -1,43 +1,65 @@
+import logging
+
+from langchain_core.embeddings import Embeddings
 from sentence_transformers import SentenceTransformer
 
-MODEL_NAME = "intfloat/multilingual-e5-large"
+from config import get_settings
+
+logger = logging.getLogger(__name__)
 
 
-class E5Embeddings:
-    def __init__(self, model_name: str = MODEL_NAME) -> None:
-        self.model = SentenceTransformer(model_name)
+class E5Embeddings(Embeddings):
+    def __init__(
+        self,
+        model_name: str | None = None,
+        fallback_model_name: str | None = None,
+        batch_size: int | None = None,
+        device: str | None = None,
+    ) -> None:
+        settings = get_settings()
+        self.model_name = model_name or settings.embedding_model
+        self.fallback_model_name = (
+            fallback_model_name or settings.embedding_fallback_model
+        )
+        self.batch_size = batch_size or settings.embedding_batch_size
+        self.device = device or settings.embedding_device
+        self.model = self._load_model()
         self.dimension = self.model.get_sentence_embedding_dimension()
+        self.use_prefixes = "e5" in self.model_name.lower()
+
+    def _load_model(self) -> SentenceTransformer:
+        try:
+            return SentenceTransformer(self.model_name, device=self.device)
+        except Exception:
+            logger.warning(
+                "Не удалось загрузить модель %s, переключаюсь на %s",
+                self.model_name,
+                self.fallback_model_name,
+            )
+            self.model_name = self.fallback_model_name
+            return SentenceTransformer(self.model_name, device=self.device)
+
+    def _prepare_documents(self, texts: list[str]) -> list[str]:
+        if not self.use_prefixes:
+            return texts
+        return [f"passage: {text}" for text in texts]
+
+    def _prepare_query(self, text: str) -> str:
+        if not self.use_prefixes:
+            return text
+        return f"query: {text}"
 
     def embed_documents(self, texts: list[str]) -> list[list[float]]:
-        prepared = [f"passage: {text}" for text in texts]
         vectors = self.model.encode(
-            prepared,
+            self._prepare_documents(texts),
             normalize_embeddings=True,
-            batch_size=16,
+            batch_size=self.batch_size,
         )
         return vectors.tolist()
 
     def embed_query(self, text: str) -> list[float]:
         vector = self.model.encode(
-            f"query: {text}",
+            self._prepare_query(text),
             normalize_embeddings=True,
         )
         return vector.tolist()
-
-
-if __name__ == "__main__":
-    import numpy as np
-
-    embedder = E5Embeddings()
-    print(embedder.dimension)
-
-    docs = [
-        "Курс по маркетплейсам: как запустить продажи на Ozon и Wildberries.",
-        "Курс по финансовой грамотности: личный бюджет и налоги.",
-        "Курс по открытию табачного магазина: лицензии и закупки.",
-    ]
-    doc_vectors = np.array(embedder.embed_documents(docs))
-    query_vector = np.array(embedder.embed_query("хочу открыть табачный магазин"))
-    scores = doc_vectors @ query_vector
-    for text, score in sorted(zip(docs, scores), key=lambda item: item[1], reverse=True):
-        print(f"{score:.4f}  {text}")
