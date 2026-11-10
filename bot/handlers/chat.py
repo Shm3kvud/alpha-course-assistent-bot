@@ -2,7 +2,7 @@ from aiogram import Router, types, F
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.context import FSMContext
 
-from rag.pipeline import answer
+# from rag.pipeline import answer для раг!
 
 
 router = Router()
@@ -31,6 +31,4 @@ async def get_question(message: types.Message):
         return
     
     
-    response = await answer(query=question)
-    
-    await messag.answer(response)
+    await message.answer("Тут будет подключена RAG-система. В разработке")

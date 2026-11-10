@@ -1,6 +1,6 @@
 from aiogram import Router, types
 from aiogram.filters import CommandStart
-from bot.keyboards import button
+from bot.keyboards.keyboards import button
 
 
 router = Router()
