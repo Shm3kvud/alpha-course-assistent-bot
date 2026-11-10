@@ -192,7 +192,7 @@ async def main():
     with open("data_extracted.json", "w", encoding="utf-8") as f:
         json.dump(output_data, f, ensure_ascii=False, indent=2)
         
-    print("✅ Данные успешно сохранены в файл data_extracted.json")
+    print("Данные успешно сохранены в файл data_extracted.json")
 
 if __name__ == "__main__":        
     if sys.platform == "win32":
