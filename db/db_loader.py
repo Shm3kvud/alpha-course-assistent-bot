@@ -1,5 +1,10 @@
 import psycopg
 import asyncio
+<<<<<<< HEAD
+=======
+import sys
+#import json
+>>>>>>> c9ec92b (подправила прототип чтения из бд)
 from langchain_core.documents import Document
 from config import get_settings
 
@@ -27,6 +32,7 @@ async def load_documents():
 async def load_calculators():
     return
 
+<<<<<<< HEAD
 async def main():
     conn = await connection_to_db()
     async with conn.cursor() as cursor:
@@ -42,3 +48,53 @@ async def main():
 
 if __name__ == "__main__":        
     asyncio.run(main())
+=======
+async def get_all_documents() -> list[Document]:
+    global docs
+    
+    conn = await connection_to_db()
+    async with conn.cursor() as cursor:
+        docs.extend(await load_courses(cursor))
+        docs.extend(await load_articles(cursor))
+        docs.extend(await load_webinars(cursor))
+        docs.extend(await load_podcasts(cursor))
+        docs.extend(await load_documents(cursor))
+        docs.extend(await load_calculators(cursor))
+
+    await conn.close()
+
+    print(f"Успешно загружено документов: {len(docs)}")
+    if docs:
+        print("\nПример первого документа:")
+        print(docs[0].page_content)
+
+    output_data = []
+    for doc in docs:
+        safe_metadata = {k: str(v) for k, v in doc.metadata.items()}
+        output_data.append({
+            "text": doc.page_content,
+            "metadata": safe_metadata
+        })
+
+    '''Для тестирования, что считывается в итоге:
+    output_data = []
+    for doc in docs:
+        safe_metadata = {k: str(v) for k, v in doc.metadata.items()}
+        output_data.append({
+            "text": doc.page_content,
+            "metadata": safe_metadata
+        })
+        
+    with open("data_extracted.json", "w", encoding="utf-8") as f:
+        json.dump(output_data, f, ensure_ascii=False, indent=2)
+    print("Данные успешно сохранены в файл data_extracted.json")
+    '''
+
+    return docs
+
+if __name__ == "__main__":
+    if sys.platform == "win32":
+        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy()) # noqa
+        
+    docs = asyncio.run(get_all_documents())
+>>>>>>> c9ec92b (подправила прототип чтения из бд)
