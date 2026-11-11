@@ -1,5 +1,5 @@
 import logging
-from rag.retriever import retrieve
+from rag.retriever import aretrieve
 from llm.client import generate
 from llm.prompts import system_prompt
 from memory.session import get_history, add_to_history
@@ -10,7 +10,7 @@ async def answer(query: str, user_id: int) -> str:
     history = get_history(user_id)
 
     try:
-        docs = await retrieve(query, k=5)
+        docs = await aretrieve(query, k=5)
     except Exception:
         log.exception("Ошибка при поиске в БД")
         return "Извините, у меня проблемы с базой знаний. Попробуйте позже."
@@ -20,6 +20,13 @@ async def answer(query: str, user_id: int) -> str:
         return "К сожалению, я не нашёл ответа на этот вопрос. Уточните у оператора."
 
     context_blocks = [doc.page_content for doc in docs]
+    for doc in docs:
+        block = doc.page_content
+        clean_meta = {k: v for k, v in doc.metadata.items() if k not in ["id"]}
+        if clean_meta:
+            block += f"\n[Факты: {clean_meta}]"
+        context_blocks.append(block)
+    
     context = "\n\n".join(context_blocks)
 
     try:
