@@ -17,18 +17,18 @@ class Settings(BaseSettings):
 
     # векторная бд
     vector_database_url: PostgresDsn
-    collection_name: str = "courses"
+    collection_name: str = "knowledge"
 
     # модель эмбеддингов, 2 вариации, определяется при старте из условий
     # размер батча и на чем работает
-    embedding_model: str = "intfloat/multilingual-e5-large"
-    embedding_fallback_model: str = "intfloat/multilingual-e5-small"
+    embedding_model: str = "intfloat/multilingual-e5-small"
+    embedding_fallback_model: str = "intfloat/multilingual-e5-large"
     embedding_batch_size: int = Field(16, gt=0)
     embedding_device: str = "cpu"
 
     # для retrieval.py
     top_k: int = Field(5, gt=0)
-    score_threshold: float = Field(0.7, ge=0, le=1)
+    score_threshold: float = Field(0.84, ge=0, le=1)
 
     # токен бота
     bot_token: SecretStr | None = None

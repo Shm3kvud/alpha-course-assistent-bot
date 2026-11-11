@@ -11,16 +11,12 @@ logger = logging.getLogger(__name__)
 class E5Embeddings(Embeddings):
     def __init__(
         self,
-        model_name: str | None = None,
-        fallback_model_name: str | None = None,
         batch_size: int | None = None,
         device: str | None = None,
     ) -> None:
         settings = get_settings()
-        self.model_name = model_name or settings.embedding_model
-        self.fallback_model_name = (
-            fallback_model_name or settings.embedding_fallback_model
-        )
+        self.model_name = settings.embedding_model
+        self.fallback_model_name = settings.embedding_fallback_model
         self.batch_size = batch_size or settings.embedding_batch_size
         self.device = device or settings.embedding_device
         self.model = self._load_model()
