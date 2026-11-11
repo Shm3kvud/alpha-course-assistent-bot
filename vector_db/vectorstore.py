@@ -47,9 +47,9 @@ def add_documents(docs: list[Document], ids: list[str]) -> None:
     logger.info("Записано/обновлено документов: %d", len(ids))
 
 
-def search(query: str) -> list[tuple[Document, float]]:
+def search(query: str, k: int | None = None) -> list[tuple[Document, float]]:
     settings = get_settings()
-    k = settings.top_k
+    k = k or settings.top_k
     vector_store = get_vectorstore()
     results = vector_store.similarity_search_with_score(query=query, k=k)
 
