@@ -14,7 +14,7 @@ def _get_llm() -> GigaChat:
     settings = get_settings()
     if _llm is None:
         _llm = GigaChat(
-            credentials=settings.gigachat_api_key,
+            credentials=settings.gigachat_api_key.get_secret_value(),
             verify_ssl_certs=False,
             model=settings.gigachat_model,
             temperature=0.2,
