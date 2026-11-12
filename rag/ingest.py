@@ -1,6 +1,9 @@
-from db.db_loader import get_all_documents
+import asyncio
+import sys
+
 from langchain_core.documents import Document
 
+from db.db_loader import get_all_documents
 from vector_db.vectorstore import add_documents, get_vectorstore
 
 BATCH_SIZE = 200
@@ -8,7 +11,7 @@ BATCH_SIZE = 200
 
 def _validate_ids(ids: list[str]):
     if len(ids) != len(set(ids)):
-        raise ValueError("Id неуникальны.")
+        raise ValueError("id неуникальны.")
 
 
 def _to_list(all_docs: dict[str, list[Document]]) -> list[Document]:
@@ -19,7 +22,7 @@ def _to_list(all_docs: dict[str, list[Document]]) -> list[Document]:
             doc_id: str | None = doc.metadata.get("id")
 
             if doc_id:
-                doc.metadata["source_type"] = doc_id[:doc_id.find(":")]
+                doc.metadata["source_type"] = doc_id[: doc_id.find(":")]
 
             list_of_docs.append(doc)
 
@@ -27,9 +30,12 @@ def _to_list(all_docs: dict[str, list[Document]]) -> list[Document]:
 
 
 def ingest() -> None:
-    all_docs = get_all_documents()
+    if sys.platform == "win32":
+        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+    all_docs = asyncio.run(get_all_documents())
     docs = _to_list(all_docs)
     ids = [doc.metadata["id"] for doc in docs]
+
     _validate_ids(ids)
 
     get_vectorstore(pre_delete=True)

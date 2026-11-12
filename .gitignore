@@ -12,3 +12,5 @@ data/
 AGENTS.md
 
 tests/
+
+data_extracted.json
