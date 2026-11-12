@@ -15,13 +15,13 @@ _vector_store: PGVector | None = None
 
 
 @lru_cache
-def get_embeddings() -> E5Embeddings:
+def _get_embeddings() -> E5Embeddings:
     return E5Embeddings()
 
 
 def _build_vector_store(pre_delete: bool) -> PGVector:
     settings = get_settings()
-    embeddings = get_embeddings()
+    embeddings = _get_embeddings()
     return PGVector(
         embeddings=embeddings,
         collection_name=settings.collection_name,
