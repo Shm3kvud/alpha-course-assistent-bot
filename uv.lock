@@ -204,6 +204,7 @@ dependencies = [
     { name = "langchain-gigachat" },
     { name = "langchain-postgres" },
     { name = "pgvector" },
+    { name = "psycopg", extra = ["binary"] },
     { name = "python-dotenv" },
     { name = "sentence-transformers" },
 ]
@@ -217,6 +218,7 @@ requires-dist = [
     { name = "langchain-gigachat", specifier = ">=0.5.1" },
     { name = "langchain-postgres", specifier = ">=0.0.19" },
     { name = "pgvector", specifier = ">=0.3.6" },
+    { name = "psycopg", extras = ["binary"], specifier = ">=3.3.8" },
     { name = "python-dotenv", specifier = ">=1.2.4" },
     { name = "sentence-transformers", specifier = ">=6.2.0" },
 ]
