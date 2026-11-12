@@ -1,7 +1,7 @@
 import psycopg
 import asyncio
 import sys
-#import json
+import json
 import re
 import html
 from langchain_core.documents import Document
@@ -185,25 +185,33 @@ async def load_articles(cur) -> list[Document]:
     articles_docs = []
     
     await cur.execute('''
-        SELECT a."Id", a."Title", a."Description", a."DescriptionTag", a."Duration", a."Url", a."Published", aut."Title" as author_name
+        SELECT a."Id", a."Title", a."Description", a."CardDescription", a."Duration", 
+               a."Url", a."Published", sub."Title" as subject_title,
+               STRING_AGG(aut."Title", ', ') as authors_list
         FROM "Articles" a
-        LEFT JOIN "Authors" aut ON a."AuthorId" = aut."Id"
-        WHERE a."IsDeleted" = false AND a."Published" IS NOT NULL;
+        LEFT JOIN "ArticleSubjects" sub ON a."SubjectId" = sub."Id"
+        LEFT JOIN "ArticleAuthorBindings" aab ON a."Id" = aab."ArticleId"
+        LEFT JOIN "Authors" aut ON aab."AuthorId" = aut."Id"
+        WHERE a."IsDeleted" = false AND a."Published" IS NOT NULL
+        GROUP BY a."Id", sub."Title";
     ''')
     rows = await cur.fetchall()
 
     for row in rows:
-        a_id, title, desc1, desc2, duration, url, published, authors_list = row
+        (a_id, title, desc1, card_desc, duration, url, published, 
+         subject_title, authors_list) = row
         
         text = f"Статья: '{title}'. "
-        if desc1: text += f"{desc1.strip()}. "
-        if desc2: text += f"{desc2.strip()}. "
+        if subject_title: text += f"Рубрика: {subject_title}. "
+        if card_desc: text += f"{clean_html(card_desc)}. "
+        elif desc1: text += f"{clean_html(desc1)}. "
             
         articles_docs.append(Document(
-            page_content=text,
+            page_content=text.strip(),
             metadata={
                 "id": f"article:{a_id}",
-                "url": f"{ARTICLES_URL}/{url}",
+                "url": f"{ARTICLES_URL}/{url}" if url else None,
+                "subject": str(subject_title) if subject_title else None,
                 "authors": str(authors_list) if authors_list else None,
                 "duration": str(duration) if duration else None,
                 "date_created": str(published)[0:10] if published else None,
@@ -213,20 +221,24 @@ async def load_articles(cur) -> list[Document]:
 
 async def load_webinars(cur) -> list[Document]:
     webinars_docs = []
-    
+
     await cur.execute('''
         SELECT w."Id", w."Title", w."Description", w."DescriptionExt", w."Url", 
-               w."StartsAt", w."EndsAt", w."Duration", w."Rating", 
-               w."IsRegistrationRequired", st."Title" as status
+               w."StartsAt", w."EndsAt", w."Duration", w."Rating",
+               w."IsRegistrationRequired", st."Title" as status,
+               STRING_AGG(a."Title", ', ') as authors_list
         FROM "Webinars" w
         LEFT JOIN "Statuses" st ON w."StatusId" = st."Id"
+        LEFT JOIN "WebinarAuthorBindings" wab ON w."Id" = wab."WebinarId"
+        LEFT JOIN "Authors" a ON wab."AuthorId" = a."Id"
         WHERE w."IsDeleted" = false AND st."Title" NOT IN ('Черновик', 'Снят с публикации', 'Архив', 'Работа не начата')
+        GROUP BY w."Id", st."Title"
     ''')
     rows = await cur.fetchall()
 
     for row in rows:
         (w_id, title, desc, desc_ext, url, starts_at, ends_at, duration, 
-         rating, is_reg_req, status) = row
+         rating, is_reg_req, status, authors_list) = row
         
         await cur.execute('''
             SELECT f."Title", f."Extension", f."Url"
@@ -254,6 +266,7 @@ async def load_webinars(cur) -> list[Document]:
             metadata={
                 "id": f"webinar:{w_id}",
                 "url": f"{WEBINARS_URL}/{url}" if url else None,
+                "authors": str(authors_list) if authors_list else None,
                 "status": str(status) if status else None,
                 "starts_at": str(starts_at)[:16] if starts_at else None,
                 "ends_at": str(ends_at)[:16] if ends_at else None,
@@ -267,51 +280,86 @@ async def load_webinars(cur) -> list[Document]:
 
 async def load_podcasts(cur) -> list[Document]:
     podcasts_docs = []
+    
     await cur.execute('''
-        SELECT "Id", "Title", "Description", "DescriptionExt", "Url", "Duration", "Published"
-        FROM "Podcasts"
-        WHERE "IsDeleted" = false AND "Published" IS NOT NULL;
+        SELECT p."Id", p."Title", p."Description", p."DescriptionExt", p."Url", 
+               p."Duration", p."Published", p."Rating",
+               STRING_AGG(a."Title", ', ') as authors_list
+        FROM "Podcasts" p
+        LEFT JOIN "PodcastAuthorBindings" pab ON p."Id" = pab."PodcastId"
+        LEFT JOIN "Authors" a ON pab."AuthorId" = a."Id"
+        WHERE p."IsDeleted" = false AND p."Published" IS NOT NULL
+        GROUP BY p."Id";
     ''')
     rows = await cur.fetchall()
 
     for row in rows:
-        p_id, title, desc, desc_ext, url, duration, published = row
+        p_id, title, desc, desc_ext, url, duration, published, rating, authors_list = row
         
+        await cur.execute('SELECT "Title", "Position", "Company" FROM "PodcastExperts" WHERE "PodcastId" = %s', (p_id,))
+        experts = await cur.fetchall()
+        experts_metadata = [{"name": e[0], "position": e[1], "company": e[2]} for e in experts]
+        
+        await cur.execute('''
+            SELECT f."Title", f."Extension", f."Url"
+            FROM "Files" f
+            JOIN "PodcastFiles" pf ON f."Id" = pf."FileId"
+            WHERE pf."PodcastId" = %s
+        ''', (p_id,))
+        files = await cur.fetchall()
+        files_metadata = [{"title": f[0], "ext": f[1], "url": f"{FILES_URL}/{f[2]}" if f[2] else None} for f in files]
+        
+        await cur.execute('SELECT "SubscriptionId" FROM "PodcastSubscriptions" WHERE "PodcastId" = %s', (p_id,))
+        subs = await cur.fetchall()
+  
+        is_subscription_only = len(subs) > 0 
+
         text = f"Подкаст: '{title}'. "
-        if desc: text += f"{desc.strip()}. "
-        if desc_ext: text += f"{desc_ext.strip()}. "
+        if desc: text += f"{clean_html(desc)}. "
+        if desc_ext: text += f"{clean_html(desc_ext)}. "
             
         podcasts_docs.append(Document(
-            page_content=text,
+            page_content=text.strip(),
             metadata={
                 "id": f"podcast:{p_id}",
                 "url": f"{PODCASTS_URL}/{url}" if url else None,
                 "duration": str(duration) if duration else None,
-                "published_at": str(published) if published else None
+                "rating": str(rating) if rating else None,
+                "published_at": str(published)[:10] if published else None,
+                "authors": str(authors_list) if authors_list else None,
+                "experts": experts_metadata if experts_metadata else None,
+                "files": files_metadata if files_metadata else None,
+                "requires_subscription": is_subscription_only
             }
         ))
     return podcasts_docs
 
 async def load_documents(cur) -> list[Document]:
     documents_docs = []
+    
     await cur.execute('''
-        SELECT "Id", "Title", "Description", "Url"
-        FROM "Documents"
-        WHERE "IsDeleted" = false;
+        SELECT d."Id", d."Title", d."Description", d."Url", d."Extension", 
+               st."Title" as status
+        FROM "Documents" d
+        LEFT JOIN "Statuses" st ON d."StatusId" = st."Id"
+        WHERE d."IsDeleted" = false 
+          AND st."Title" NOT IN ('Черновик', 'Снят с публикации', 'Архив')
     ''')
     rows = await cur.fetchall()
 
     for row in rows:
-        d_id, title, desc, url = row
+        d_id, title, desc, url, ext, status = row
         
         text = f"Шаблон документа: '{title}'. "
         if desc: text += f"{clean_html(desc).strip()}. "
             
         documents_docs.append(Document(
-            page_content=text,
+            page_content=text.strip(),
             metadata={
                 "id": f"document:{d_id}",
-                "url": f"{DOCUMENTS_URL}/{url}"
+                "url": f"{DOCUMENTS_URL}/{url}" if url else None,
+                "extension": str(ext) if ext else None,
+                "status": str(status) if status else None,
             }
         ))
     return documents_docs
@@ -340,6 +388,55 @@ async def load_calculators(cur) -> list[Document]:
         ))
     return calculators_docs
 
+async def load_subscriptions(cur) -> list[Document]:
+    subscriptions_docs = []
+    
+    await cur.execute('''
+        SELECT s."Id", s."Title", s."Description", st."Title" as tariff_name, 
+               st."Cost", st."DiscountCost", st."RecurrenceValue"
+        FROM "Subscription" s
+        LEFT JOIN "SubscriptionTariffs" st ON s."Id" = st."SubscriptionId"
+        WHERE s."IsDeleted" = false;
+    ''')
+
+    rows = await cur.fetchall()
+
+    grouped = {}
+    for row in rows:
+        s_id, title, desc, tariff_name, cost, discount_cost, recurrence = row
+        
+        if s_id not in grouped:
+            grouped[s_id] = {
+                "title": title,
+                "desc": desc,
+                "tariffs": []
+            }
+            
+        if tariff_name:
+            grouped[s_id]["tariffs"].append({
+                "name": tariff_name,
+                "cost": cost,
+                "discount": discount_cost,
+                "recurrence": recurrence
+            })
+
+    for s_id, data in grouped.items():
+        title = data["title"]
+        desc = data["desc"]
+        
+        text = f"Подписка: '{title}'. "
+        if desc: text += f"Описание: {clean_html(desc)}. "
+        
+        subscriptions_docs.append(Document(
+            page_content=text.strip(),
+            metadata={
+                "id": f"subscription:{s_id}",
+                "tariffs": data["tariffs"]
+            }
+        ))
+        
+    return subscriptions_docs
+
 async def get_all_documents() -> dict[str, list[Document]]:
     all_data = {}
     
@@ -354,6 +451,7 @@ async def get_all_documents() -> dict[str, list[Document]]:
         all_data["Статьи"] = await load_articles(cursor)
         all_data["Шаблоны"] = await load_documents(cursor)
         all_data["Калькуляторы"] = await load_calculators(cursor)
+        all_data["Подписки"] = await load_subscriptions(cursor)
 
     await conn.close()
 
@@ -366,7 +464,7 @@ async def get_all_documents() -> dict[str, list[Document]]:
                 print(f"\nПример первого документа (из категории '{category}'):")
                 print(docs_list[0].page_content)
                 break 
-    ''' Для тестов
+
     output_data = {}
     for category, docs_list in all_data.items():
         output_data[category] = [
@@ -380,11 +478,11 @@ async def get_all_documents() -> dict[str, list[Document]]:
     with open("data_extracted.json", "w", encoding="utf-8") as f:
         json.dump(output_data, f, ensure_ascii=False, indent=2)
     print("\nДанные успешно сохранены в файл data_extracted.json")
-    '''
+
     return all_data
 
 if __name__ == "__main__":
     if sys.platform == "win32":
-        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy()) # noqa
+        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
         
     docs = asyncio.run(get_all_documents())
