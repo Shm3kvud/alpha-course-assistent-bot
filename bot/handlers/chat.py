@@ -2,8 +2,8 @@ from db.history import create_chat, get_last_chat, save_message, get_user_chats
 from aiogram import Router, types, F
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.context import FSMContext
-
-# from rag.pipeline import answer для раг!
+from bot.keyboards.keyboards import button
+from rag.pipeline import answer
 
 
 router = Router()
@@ -39,7 +39,7 @@ async def get_question(message: types.Message):
         
     await save_message(chat_id, "user", question)
     
-    response = "Тут будет подключена RAG-система. В разработке"
+    response = await answer(question, message.from_user.id)
     
     await message.answer(response)
     
@@ -59,18 +59,67 @@ async def new_chat(callback: types.CallbackQuery, state: FSMContext):
     
     
 @router.callback_query(F.data == "history")
+@router.callback_query(F.data.startswith("history_page:"))
 async def show_history(callback: types.CallbackQuery):
     await callback.answer()
     
     chats = await get_user_chats(callback.from_user.id)
     
-    if not chats:
-        await callback.message.answer("История диалогов пуста")
-        return
+    page = 0
     
-    text = "Твои диалоги:\n\n"
-    
-    for chat in chats:
-        text += f"{chat['id']}. {chat['title']}\n"
+    if callback.data.startswith("history_page:"):
+        page = int(callback.data.split(":")[1])
         
-    await callback.message.answer(text)
+    total_pages = max(1, (len(chats) + 7) // 8)
+    page = max(0, min(page, total_pages - 1))
+    
+    keyboard = []
+    
+    for chat in chats[page * 8:(page + 1) * 8]:
+        keyboard.append([
+            types.InlineKeyboardButton(
+                text=f"{chat['id']}. {chat['title'][:40]}",
+                callback_data=f"open_chat:{chat['id']}:[{page}]"
+            )
+        ])
+    
+    if total_pages > 1:
+        keyboard.append([
+            types.InlineKeyboardButton(
+                text = "❮",
+                callback_data=f"history_page:{page - 1}" if page > 0 else "history_noop"
+            ),
+            types.InlineKeyboardButton(
+                text=f"{page + 1}/{total_pages}",
+                callback_data="history_noop"
+            ),
+            types.InlineKeyboardButton(
+                text="❯",
+                callback_data=f"history_page:{page + 1}" if page < total_pages - 1 else "history_noop"
+            )
+        ])
+        
+    keyboard.append([
+        types.InlineKeyboardButton(
+            text="← Назад в главное меню",
+            callback_data="back_menu"
+        )
+    ])
+    
+    text = "История диалогов\nВыбери диалог:" if chats else "История пока пустая"
+    
+    await callback.message.edit_text(
+        text,
+        reply_markup=types.InlineKeyboardMarkup(inline_keyboard=keyboard)
+    )
+    
+@router.callback_query(F.data == "back_menu")
+async def back_menu(callback: types.CallbackQuery):
+    await callback.answer()
+    
+    name = callback.from_user.first_name
+    
+    await callback.message.edit_text(
+        f"👋 Добро пожаловать в AlfaAI, {name}!",
+        reply_markup=button
+    )
