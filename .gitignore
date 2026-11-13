@@ -10,3 +10,9 @@ data/
 data/
 
 AGENTS.md
+
+tests/
+
+data_extracted.json
+
+demo_rag.py
