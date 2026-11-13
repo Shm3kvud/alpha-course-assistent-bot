@@ -17,4 +17,4 @@ def add_to_history(user_id: int, user_message: str, bot_message: str):
     })
     
     _history_storage[user_id] = _history_storage[user_id][-5:]
-    log.info(f"История для {user_id} обновлена. Всего сообщений: {len(_history_storage[user_id])}")
+    log.info("История для %s обновлена. Всего сообщений: %d", user_id, len(_history_storage[user_id]))

@@ -4,8 +4,11 @@ import sys
 import json
 import re
 import html
+import logging
 from langchain_core.documents import Document
 from config import get_settings
+
+log = logging.getLogger(__name__)
 
 BASE_URL = "https://kurs.alfabank.ru"
 COURSES_URL = f"{BASE_URL}/courses"
@@ -443,29 +446,71 @@ async def get_all_documents() -> dict[str, list[Document]]:
     all_data = {}
 
     conn = await connection_to_db()
-    async with conn.cursor() as cursor:
-        all_data["Курсы"] = await load_courses(cursor)
-        all_data["Уроки"] = await load_lessons(cursor)
-        all_data["Частые вопросы о курсах"] = await load_course_questions(cursor)
-        all_data["Доп информация о курсах"] = await load_course_info(cursor)
-        all_data["Вебинары"] = await load_webinars(cursor)
-        all_data["Подкасты"] = await load_podcasts(cursor)
-        all_data["Статьи"] = await load_articles(cursor)
-        all_data["Шаблоны"] = await load_documents(cursor)
-        all_data["Калькуляторы"] = await load_calculators(cursor)
-        all_data["Подписки"] = await load_subscriptions(cursor)
-
-    await conn.close()
+    try:
+        async with conn.cursor() as cursor:
+            try:
+                all_data["Курсы"] = await load_courses(cursor)
+            except Exception:
+                log.exception("Не удалось загрузить «Курсы»")
+                raise
+            try:
+                all_data["Уроки"] = await load_lessons(cursor)
+            except Exception:
+                log.exception("Не удалось загрузить «Уроки»")
+                raise
+            try:
+                all_data["Частые вопросы о курсах"] = await load_course_questions(cursor)
+            except Exception:
+                log.exception("Не удалось загрузить «Частые вопросы о курсах»")
+                raise
+            try:
+                all_data["Доп информация о курсах"] = await load_course_info(cursor)
+            except Exception:
+                log.exception("Не удалось загрузить «Доп информация о курсах»")
+                raise
+            try:
+                all_data["Вебинары"] = await load_webinars(cursor)
+            except Exception:
+                log.exception("Не удалось загрузить «Вебинары»")
+                raise
+            try:
+                all_data["Подкасты"] = await load_podcasts(cursor)
+            except Exception:
+                log.exception("Не удалось загрузить «Подкасты»")
+                raise
+            try:
+                all_data["Статьи"] = await load_articles(cursor)
+            except Exception:
+                log.exception("Не удалось загрузить «Статьи»")
+                raise
+            try:
+                all_data["Шаблоны"] = await load_documents(cursor)
+            except Exception:
+                log.exception("Не удалось загрузить «Шаблоны»")
+                raise
+            try:
+                all_data["Калькуляторы"] = await load_calculators(cursor)
+            except Exception:
+                log.exception("Не удалось загрузить «Калькуляторы»")
+                raise
+            try:
+                all_data["Подписки"] = await load_subscriptions(cursor)
+            except Exception:
+                log.exception("Не удалось загрузить «Подписки»")
+                raise
+    finally:
+        await conn.close()
 
     total_docs = sum(len(docs_list) for docs_list in all_data.values())
-    print(f"Успешно загружено документов: {total_docs}")
+    log.info("Загружено документов: %d", total_docs)
 
-    if all_data:
-        for category, docs_list in all_data.items():
-            if docs_list:
-                print(f"\nПример первого документа (из категории '{category}'):")
-                print(docs_list[0].page_content)
-                break
+    # вывод первого документа для примера
+    # if all_data:
+    #     for category, docs_list in all_data.items():
+    #         if docs_list:
+    #             print(f"\nПример первого документа (из категории '{category}'):")
+    #             print(docs_list[0].page_content)
+    #             break
 
     output_data = {}
     for category, docs_list in all_data.items():
@@ -479,7 +524,7 @@ async def get_all_documents() -> dict[str, list[Document]]:
 
     with open("data_extracted.json", "w", encoding="utf-8") as f:
         json.dump(output_data, f, ensure_ascii=False, indent=2)
-    print("\nДанные успешно сохранены в файл data_extracted.json")
+    log.info("Данные успешно сохранены в файл data_extracted.json")
 
     return all_data
 
